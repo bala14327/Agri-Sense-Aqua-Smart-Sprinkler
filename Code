@@ -1,0 +1,254 @@
+{
+  "nbformat": 4,
+  "nbformat_minor": 0,
+  "metadata": {
+    "colab": {
+      "provenance": [],
+      "authorship_tag": "ABX9TyOLLxrBZp7/1ticYHEMr/t6",
+      "include_colab_link": true
+    },
+    "kernelspec": {
+      "name": "python3",
+      "display_name": "Python 3"
+    },
+    "language_info": {
+      "name": "python"
+    }
+  },
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "view-in-github",
+        "colab_type": "text"
+      },
+      "source": [
+        "<a href=\"https://colab.research.google.com/github/bala14327/Agri-Sense-Aqua-Smart-Sprinkler/blob/main/Code\" target=\"_parent\"><img src=\"https://colab.research.google.com/assets/colab-badge.svg\" alt=\"Open In Colab\"/></a>"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": 1,
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "j8xQfDxgXiyB",
+        "outputId": "330066df-ac0f-4c5c-8fa8-ce348fa75dec"
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Root Mean Squared Error (RMSE): 0.3081283401671354\n",
+            "R² Score: 0.8035413084860086\n",
+            "Accuracy (within 5% error margin): 95.61%\n",
+            "For the crop type 'corn', the predicted water required is: 1.30 liters per square meter.\n"
+          ]
+        },
+        {
+          "output_type": "stream",
+          "name": "stderr",
+          "text": [
+            "/usr/local/lib/python3.10/dist-packages/sklearn/base.py:493: UserWarning: X does not have valid feature names, but OneHotEncoder was fitted with feature names\n",
+            "  warnings.warn(\n",
+            "/usr/local/lib/python3.10/dist-packages/sklearn/base.py:493: UserWarning: X does not have valid feature names, but StandardScaler was fitted with feature names\n",
+            "  warnings.warn(\n"
+          ]
+        }
+      ],
+      "source": [
+        "import pandas as pd\n",
+        "from sklearn.model_selection import train_test_split\n",
+        "from sklearn.preprocessing import OneHotEncoder, StandardScaler\n",
+        "from sklearn.ensemble import RandomForestRegressor\n",
+        "from sklearn.metrics import mean_squared_error, r2_score\n",
+        "import numpy as np\n",
+        "\n",
+        "# Load dataset (replace 'smart_sprinkler_dataset (2).csv' with your actual dataset path)\n",
+        "data = pd.read_csv('smart_sprinkler_dataset (2).csv')\n",
+        "\n",
+        "# Features and target\n",
+        "X = data[['Soil Moisture (%)', 'Temperature (°C)', 'Humidity (%)', 'Crop Type']]  # Features\n",
+        "y = data['Water Required (liters per sq. meter)']  # Target\n",
+        "\n",
+        "# One-Hot Encoding for categorical variable (Crop Type)\n",
+        "encoder = OneHotEncoder(sparse_output=False)\n",
+        "X_encoded = encoder.fit_transform(X[['Crop Type']])\n",
+        "\n",
+        "# Drop 'Crop Type' column and concatenate the one-hot encoded features\n",
+        "X = X.drop(['Crop Type'], axis=1)\n",
+        "X = pd.concat([X.reset_index(drop=True), pd.DataFrame(X_encoded, columns=encoder.get_feature_names_out())], axis=1)\n",
+        "\n",
+        "# Standardize the numerical features\n",
+        "scaler = StandardScaler()\n",
+        "X_scaled = scaler.fit_transform(X)\n",
+        "\n",
+        "# Split the dataset into training and testing sets (70% train, 30% test)\n",
+        "X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.3, random_state=32)\n",
+        "\n",
+        "# Initialize and train the RandomForestRegressor model with limited depth and other parameters\n",
+        "model = RandomForestRegressor(\n",
+        "    n_estimators=50,          # Keep the number of trees moderate\n",
+        "    max_depth=3,              # Limit the maximum depth of the trees\n",
+        "    min_samples_split=5,      # Require at least 5 samples to split an internal node\n",
+        "    random_state=32\n",
+        ")\n",
+        "model.fit(X_train, y_train)\n",
+        "\n",
+        "# Predict the water requirement on the test set\n",
+        "y_pred = model.predict(X_test)\n",
+        "\n",
+        "# Evaluate the model performance\n",
+        "mse = mean_squared_error(y_test, y_pred)\n",
+        "rmse = mse ** 0.5\n",
+        "r2 = r2_score(y_test, y_pred)  # R² score\n",
+        "\n",
+        "# Calculate custom accuracy\n",
+        "error_margin = 0.5  # 5% margin\n",
+        "accurate_predictions = np.abs(y_pred - y_test.values) <= (error_margin * y_test.values)\n",
+        "accuracy = np.mean(accurate_predictions) * 100  # Percentage of accurate predictions\n",
+        "\n",
+        "# Print evaluation metrics\n",
+        "print(f\"Root Mean Squared Error (RMSE): {rmse}\")\n",
+        "print(f\"R² Score: {r2}\")\n",
+        "print(f\"Accuracy (within 5% error margin): {accuracy:.2f}%\")\n",
+        "\n",
+        "# Example prediction on new input (replace with real sensor inputs)\n",
+        "new_input = [[40, 30, 60]]  # [Soil moisture, Temperature, Humidity]\n",
+        "crop_type = 'corn'  # Example crop type\n",
+        "\n",
+        "# One-hot encode the crop type for prediction\n",
+        "crop_type_input = encoder.transform([[crop_type]])  # One-hot encode the selected crop type\n",
+        "\n",
+        "# Combine sensor inputs with encoded crop type\n",
+        "new_input_encoded = np.hstack([new_input, crop_type_input])\n",
+        "\n",
+        "# Scale the new input\n",
+        "new_input_scaled = scaler.transform(new_input_encoded)\n",
+        "\n",
+        "# Predict the water requirement\n",
+        "predicted_water = model.predict(new_input_scaled)\n",
+        "\n",
+        "# Output the result\n",
+        "print(f\"For the crop type '{crop_type}', the predicted water required is: {predicted_water[0]:.2f} liters per square meter.\")"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# Import necessary libraries\n",
+        "import pandas as pd\n",
+        "from sklearn.model_selection import train_test_split\n",
+        "from sklearn.preprocessing import OneHotEncoder, StandardScaler\n",
+        "from sklearn.ensemble import RandomForestRegressor\n",
+        "from sklearn.metrics import mean_squared_error, r2_score\n",
+        "import numpy as np\n",
+        "\n",
+        "# Load dataset (replace 'smart_sprinkler_dataset (2).csv' with your actual dataset path)\n",
+        "data = pd.read_csv('smart_sprinkler_dataset (2).csv')\n",
+        "\n",
+        "# Features and target\n",
+        "X = data[['Soil Moisture (%)', 'Temperature (°C)', 'Humidity (%)', 'Crop Type']]  # Features\n",
+        "y = data['Water Required (liters per sq. meter)']  # Target\n",
+        "\n",
+        "# One-Hot Encoding for categorical variable (Crop Type)\n",
+        "encoder = OneHotEncoder(sparse_output=False)\n",
+        "X_encoded = encoder.fit_transform(X[['Crop Type']])\n",
+        "\n",
+        "# Drop 'Crop Type' column and concatenate the one-hot encoded features\n",
+        "X = X.drop(['Crop Type'], axis=1)\n",
+        "X = pd.concat([X.reset_index(drop=True), pd.DataFrame(X_encoded, columns=encoder.get_feature_names_out())], axis=1)\n",
+        "\n",
+        "# Standardize the numerical features\n",
+        "scaler = StandardScaler()\n",
+        "X_scaled = scaler.fit_transform(X)\n",
+        "\n",
+        "# Split the dataset into training and testing sets (70% train, 30% test)\n",
+        "X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.3, random_state=32)\n",
+        "\n",
+        "# Initialize and train the RandomForestRegressor model with limited depth and other parameters\n",
+        "model = RandomForestRegressor(\n",
+        "    n_estimators=50,          # Keep the number of trees moderate\n",
+        "    max_depth=3,              # Limit the maximum depth of the trees\n",
+        "    min_samples_split=5,      # Require at least 5 samples to split an internal node\n",
+        "    random_state=32\n",
+        ")\n",
+        "model.fit(X_train, y_train)\n",
+        "\n",
+        "# Predict the water requirement on the test set\n",
+        "y_pred = model.predict(X_test)\n",
+        "\n",
+        "# Evaluate the model performance\n",
+        "mse = mean_squared_error(y_test, y_pred)\n",
+        "rmse = mse ** 0.5\n",
+        "r2 = r2_score(y_test, y_pred)  # R² score\n",
+        "\n",
+        "# Calculate custom accuracy\n",
+        "error_margin = 0.5  # 5% margin\n",
+        "accurate_predictions = np.abs(y_pred - y_test.values) <= (error_margin * y_test.values)\n",
+        "accuracy = np.mean(accurate_predictions) * 100  # Percentage of accurate predictions\n",
+        "\n",
+        "# Print evaluation metrics\n",
+        "print(f\"Root Mean Squared Error (RMSE): {rmse}\")\n",
+        "print(f\"R² Score: {r2}\")\n",
+        "print(f\"Accuracy (within 5% error margin): {accuracy:.2f}%\")\n",
+        "\n",
+        "# Example prediction on new input (replace with real sensor inputs)\n",
+        "new_input = [[40, 30, 60]]  # [Soil moisture, Temperature, Humidity]\n",
+        "crop_type = 'corn'  # Example crop type\n",
+        "\n",
+        "# Calculate the threshold as the average of the sensor values\n",
+        "threshold_value = np.mean(new_input[0])\n",
+        "print(f\"Threshold value : {threshold_value}\")\n",
+        "\n",
+        "# One-hot encode the crop type for prediction\n",
+        "crop_type_input = encoder.transform([[crop_type]])  # One-hot encode the selected crop type\n",
+        "\n",
+        "# Combine sensor inputs with encoded crop type\n",
+        "new_input_encoded = np.hstack([new_input, crop_type_input])\n",
+        "\n",
+        "# Scale the new input\n",
+        "new_input_scaled = scaler.transform(new_input_encoded)\n",
+        "\n",
+        "# Predict the water requirement\n",
+        "predicted_water = model.predict(new_input_scaled)\n",
+        "\n",
+        "# Output the result\n",
+        "print(f\"For the crop type '{crop_type}', the predicted water required is: {predicted_water[0]:.2f} liters per square meter.\")\n"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "UpnIJc5SZAXH",
+        "outputId": "c92dc2d7-7518-4b51-b0df-965a66b00aa7"
+      },
+      "execution_count": 3,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Root Mean Squared Error (RMSE): 0.3081283401671354\n",
+            "R² Score: 0.8035413084860086\n",
+            "Accuracy (within 5% error margin): 95.61%\n",
+            "Threshold value : 43.333333333333336\n",
+            "For the crop type 'corn', the predicted water required is: 1.30 liters per square meter.\n"
+          ]
+        },
+        {
+          "output_type": "stream",
+          "name": "stderr",
+          "text": [
+            "/usr/local/lib/python3.10/dist-packages/sklearn/base.py:493: UserWarning: X does not have valid feature names, but OneHotEncoder was fitted with feature names\n",
+            "  warnings.warn(\n",
+            "/usr/local/lib/python3.10/dist-packages/sklearn/base.py:493: UserWarning: X does not have valid feature names, but StandardScaler was fitted with feature names\n",
+            "  warnings.warn(\n"
+          ]
+        }
+      ]
+    }
+  ]
+}
